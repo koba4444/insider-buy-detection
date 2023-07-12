@@ -1,0 +1,101 @@
+Based on the requirements, here are the core classes, functions, and methods that will be necessary:
+
+1. `SECWebsiteScraper`: This class will handle the scraping of the SEC website to collect Form 4 reports for insider buying transactions.
+   - `search_company(company_name: str) -> List[str]`: This method will search for the company on the SEC website and return a list of filing URLs.
+   - `get_form4_reports(filing_urls: List[str]) -> List[Form4Report]`: This method will extract the Form 4 reports from the given filing URLs and return a list of `Form4Report` objects.
+
+2. `Form4Report`: This class will represent a single Form 4 report for insider buying.
+   - Properties:
+     - `insider_name: str`: The name of the insider.
+     - `company_name: str`: The name of the company.
+     - `transaction_date: datetime`: The date of the transaction.
+     - `shares_bought: int`: The number of shares bought.
+
+3. `DataStorage`: This class will handle the storage of the collected data.
+   - `save_form4_reports(reports: List[Form4Report])`: This method will save the Form 4 reports to a data storage system.
+
+Now let's proceed with creating the necessary files and writing the code.
+
+**1. `sec_website_scraper.py`**
+
+```python
+import requests
+from bs4 import BeautifulSoup
+from typing import List
+from datetime import datetime
+
+class SECWebsiteScraper:
+    def __init__(self):
+        self.base_url = "https://www.sec.gov"
+
+    def search_company(self, company_name: str) -> List[str]:
+        search_url = f"{self.base_url}/cgi-bin/browse-edgar?action=getcompany&CIK={company_name}"
+        response = requests.get(search_url)
+        soup = BeautifulSoup(response.content, "html.parser")
+        filing_urls = []
+
+        # Extract filing URLs for Form 4 reports
+        filings_table = soup.find("table", class_="tableFile2")
+        if filings_table:
+            rows = filings_table.find_all("tr")
+            for row in rows:
+                cells = row.find_all("td")
+                if len(cells) >= 3:
+                    filing_type = cells[0].text.strip()
+                    filing_href = cells[1].find("a", href=True)
+                    if filing_type == "4" and filing_href:
+                        filing_url = f"{self.base_url}{filing_href['href']}"
+                        filing_urls.append(filing_url)
+
+        return filing_urls
+
+    def get_form4_reports(self, filing_urls: List[str]) -> List[Form4Report]:
+        form4_reports = []
+
+        for filing_url in filing_urls:
+            response = requests.get(filing_url)
+            soup = BeautifulSoup(response.content, "html.parser")
+
+            # Extract insider buying information from Form 4 reports
+            table = soup.find("table", class_="tableFile")
+            if table:
+                rows = table.find_all("tr")
+                for row in rows:
+                    cells = row.find_all("td")
+                    if len(cells) >= 5:
+                        transaction_date = datetime.strptime(cells[3].text.strip(), "%Y-%m-%d")
+                        shares_bought = int(cells[4].text.strip().replace(",", ""))
+                        form4_report = Form4Report(cells[1].text.strip(), cells[2].text.strip(), transaction_date, shares_bought)
+                        form4_reports.append(form4_report)
+
+        return form4_reports
+```
+
+**2. `form4_report.py`**
+
+```python
+from dataclasses import dataclass
+from datetime import datetime
+
+@dataclass
+class Form4Report:
+    insider_name: str
+    company_name: str
+    transaction_date: datetime
+    shares_bought: int
+```
+
+**3. `data_storage.py`**
+
+```python
+from typing import List
+
+class DataStorage:
+    def __init__(self):
+        # Initialize data storage system
+
+    def save_form4_reports(self, reports: List[Form4Report]):
+        # Save the Form 4 reports to the data storage system
+```
+
+Please note that the code provided is a basic implementation and may require additional error handling, data validation, and integration with a specific data storage system.
